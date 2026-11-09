@@ -2,7 +2,7 @@
 Slide -> RAG test pipeline (first N slides)
 
 1. python-pptx reads NATIVE content exactly (no OCR):
-     text, tables, charts, equations, speaker notes
+     text, tables, charts, equations
 2. Pictures in the slides go through the PaddleOCR-VL pipeline.
    Layout detection labels each region (text / table / formula / chart / image)
    and the right prompt is used automatically via your llama-server.
@@ -43,7 +43,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 # ---------------- CONFIG ----------------
 PPTX_PATH = r"pptx\Lecture01-Introduction (HEU-NLP).pptx"    # <-- change this
 OUTPUT_DIR = Path("slide_rag_output")
-MAX_SLIDES = 10                              # test on first 10 slides
+MAX_SLIDES = 100                              # test on first 10 slides
 SERVER_BASE = "http://127.0.0.1:8090/v1"     # your llama-server
 DEVICE = "gpu:0"                             # layout model device; "cpu" if VRAM is tight
 MIN_WIDTH_CM = 3.0                           # skip small pictures (icons, logos)
@@ -149,11 +149,8 @@ def extract_native(slide):
                 texts.append(t)
         elif is_candidate_picture(sh):
             pictures.append(get_picture(sh))
-    notes = ""
-    if slide.has_notes_slide and slide.notes_slide.notes_text_frame is not None:
-        notes = slide.notes_slide.notes_text_frame.text.strip()
     return {"title": title, "texts": texts, "tables": tables, "charts": charts,
-            "equations": equations_in_slide(slide), "pictures": pictures, "notes": notes}
+            "equations": equations_in_slide(slide), "pictures": pictures}
 
 
 # ================= OCR =================
@@ -346,9 +343,6 @@ def main():
             print(f"[slide {n}] picture {i} ({size[0]}x{size[1]}) {dt:.1f}s | "
                   f"regions: {s['labels']} | image regions OCR'd: {s['image_regions_ocrd']}")
             md += [f"## Picture {i} (OCR: {img_path.name})", text or "(no content detected)", ""]
-
-        if d["notes"]:
-            md += ["## Speaker notes", d["notes"], ""]
 
         (OUTPUT_DIR / f"slide_{n:03d}.md").write_text("\n".join(md), encoding="utf-8")
         print(f"[slide {n}] saved slide_{n:03d}.md")
