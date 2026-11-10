@@ -34,12 +34,30 @@ def load_chunks():
             c = json.loads(line)
             c["metadata"]["layer"] = "study_guide"
             chunks.append(c)
+    skipped = {"empty": 0, "outline": 0, "duplicate": 0}
+    skip_title = re.compile(config.SKIP_TITLE_RE, re.I)
+    seen_bodies = set()
     for path in config.SLIDE_CHUNK_FILES:
         with open(path, encoding="utf-8") as f:
             for line in f:
                 c = json.loads(line)
-                c["metadata"]["layer"] = "slides"
+                m = c["metadata"]
+                body = c["text"].split("\n\n", 1)[-1].strip()   # text after the context header
+                if len(body) < config.MIN_BODY_CHARS:            # title-only / logo / video slides
+                    skipped["empty"] += 1
+                    continue
+                if skip_title.search((m.get("title") or "").strip()):
+                    skipped["outline"] += 1
+                    continue
+                key = (lecture_key(m.get("source_file", "")), body)
+                if config.SKIP_DUPLICATE_SLIDES and key in seen_bodies:   # repeated outline / recap
+                    skipped["duplicate"] += 1
+                    continue
+                seen_bodies.add(key)
+                m["layer"] = "slides"
                 chunks.append(c)
+    if any(skipped.values()):
+        print("Skipped slide chunks: " + ", ".join(f"{v} {k}" for k, v in skipped.items() if v))
     if not chunks:
         raise SystemExit(f"No chunks found. Check paths in config.py (DATA_DIR={config.DATA_DIR})")
     return chunks

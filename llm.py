@@ -18,7 +18,8 @@ def source_tag(chunk):
     if m["layer"] == "study_guide":
         sec = m.get("section", "").split(" ")[0]
         return f"[{lec} Guide {sec}]"
-    return f"[{lec} Slide {m.get('slide')}]"
+    part = f" part {m['part']}" if m.get("parts", 1) > 1 else ""
+    return f"[{lec} Slide {m.get('slide')}{part}]"
 
 
 def build_messages(question, chunks):
@@ -50,5 +51,5 @@ def _stream(r):
         if data == b"[DONE]":
             break
         delta = json.loads(data)["choices"][0]["delta"]
-        if "content" in delta:
+        if delta.get("content"):          # first chunk carries only the role, content=null
             yield delta["content"]

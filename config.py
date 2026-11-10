@@ -23,6 +23,9 @@ DENSE_K = 20                  # candidates from embeddings before fusion
 BM25_K = 20                   # candidates from keyword search before fusion
 RRF_K = 60                    # reciprocal-rank-fusion constant
 EXPAND_CITED_SLIDES = 2       # per study-guide hit, add up to N of its cited slide chunks
+MIN_BODY_CHARS = 60           # skip near-empty slides (title-only, logos, video placeholders)
+SKIP_TITLE_RE = r"^(outline|agenda|contents?|review|summary|acknowledge?ments?|thanks?|q\s*&\s*a)\b"  # outline/recap slides
+SKIP_DUPLICATE_SLIDES = True  # drop a slide whose body repeats an earlier slide of the same lecture
 MAX_CONTEXT_CHARS = 9000      # ~2.5k tokens; keep well inside the LLM context window
 
 # ---- generation (llama-server, OpenAI-compatible) ----------------------
