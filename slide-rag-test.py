@@ -42,12 +42,14 @@ import requests
 from PIL import Image
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.shapes.group import GroupShape
 
 # ---------------- CONFIG ----------------
-PPTX_PATH = r"pptx\Lecture07-Vision-Language-Models.pptx"    # <-- change this
-LECTURE_NAME = ""     
-OUTPUT_DIR = Path("slide_rag_output")
-MAX_SLIDES = 100                              # test on first 10 slides; set large for all
+PPTX_DIR = Path(r"pptx")    # <-- folder with all your .pptx files
+LECTURE_NAMES = {}                           # optional: {"Lecture01-Introduction_HEU-NLP": "NLP Lecture 1"}; default = file name
+OUTPUT_DIR = Path("slide_rag_output")        # one subfolder per deck + all_chunks/ for slide_rag
+MAX_SLIDES = 100                          # per deck; set e.g. 10 for a quick test
+RESUME = True                                # skip decks that already have a chunks.jsonl (rerun after a crash)
 SERVER_BASE = "http://127.0.0.1:8090/v1"     # your llama-server
 DEVICE = "gpu:0"                             # layout model device; "cpu" if VRAM is tight
 MIN_WIDTH_CM = 3.0                           # skip small pictures (icons, logos)
@@ -102,17 +104,59 @@ def mark_examples(el):
 
 # ================= native extraction (python-pptx) =================
 
-def iter_shapes(shapes):
+A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+MC_NS = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
+SHAPE_TAGS = {"sp", "pic", "grpSp", "graphicFrame", "cxnSp"}
+
+
+def unwrap_alternate_content(slide):
+    """Text boxes that contain equations are wrapped in <mc:AlternateContent>, which python-pptx
+    skips entirely, so their text is lost. Replace each wrapper (in memory only, the file is not
+    changed) with its first <mc:Choice> content so these shapes become normal shapes."""
+    for alt in list(slide.shapes._spTree.iter(MC_NS + "AlternateContent")):
+        parent = alt.getparent()
+        choice = alt.find(MC_NS + "Choice")
+        if choice is None or not parent.tag.endswith(("}spTree", "}grpSp")):
+            continue                               # only shape-level wrappers, not inline math
+        kids = list(choice)
+        # only regular shapes; skip e.g. ink annotations (p14:contentPart), which have no text
+        if not kids or not all(k.tag.split("}")[-1] in SHAPE_TAGS for k in kids):
+            continue
+        pos = parent.index(alt)
+        for i, child in enumerate(kids):
+            parent.insert(pos + i, child)
+        parent.remove(alt)
+
+
+def iter_shapes(shapes, tf=(0.0, 1.0, 0.0, 1.0)):
+    """Yield leaf shapes with their real position/size on the slide as sh.x, sh.y, sh.w, sh.h (EMU).
+    Shapes inside a group store geometry in the group's own coordinate units, so python-pptx's
+    .left/.width are wrong for them (often ~0 cm). tf maps those units back to slide EMU."""
+    ax, sx, ay, sy = tf
     for sh in shapes:
-        if sh.shape_type == MSO_SHAPE_TYPE.GROUP:
-            yield from iter_shapes(sh.shapes)
+        if isinstance(sh, GroupShape):     # (unlike .shape_type, never raises on unusual shapes)
+            xfrm = sh._element.grpSpPr.find(A_NS + "xfrm")
+            ch_off = xfrm.find(A_NS + "chOff") if xfrm is not None else None
+            ch_ext = xfrm.find(A_NS + "chExt") if xfrm is not None else None
+            gx = gy = 1.0
+            cx0 = cy0 = 0
+            if ch_ext is not None and int(ch_ext.get("cx")) and int(ch_ext.get("cy")):
+                gx = (sh.width or 0) / int(ch_ext.get("cx"))
+                gy = (sh.height or 0) / int(ch_ext.get("cy"))
+            if ch_off is not None:
+                cx0, cy0 = int(ch_off.get("x")), int(ch_off.get("y"))
+            # child coord c -> parent coord: left + (c - chOff) * g -> slide: a + s * parent
+            yield from iter_shapes(sh.shapes, (ax + sx * ((sh.left or 0) - cx0 * gx), sx * gx,
+                                               ay + sy * ((sh.top or 0) - cy0 * gy), sy * gy))
         else:
+            sh.x, sh.w = ax + sx * (sh.left or 0), sx * (sh.width or 0)
+            sh.y, sh.h = ay + sy * (sh.top or 0), sy * (sh.height or 0)
             yield sh
 
 
 def reading_order(shapes):
     """Top-to-bottom, then left-to-right (python-pptx order is drawing order, not reading)."""
-    return sorted(shapes, key=lambda s: ((s.top or 0) // 200_000, s.left or 0))
+    return sorted(shapes, key=lambda s: (s.y // 200_000, s.x))
 
 
 def table_to_md(table):
@@ -175,7 +219,7 @@ def get_picture(sh):
 
 
 def is_candidate_picture(sh):
-    return get_picture(sh) is not None and sh.width and sh.width >= MIN_WIDTH_CM * EMU_PER_CM
+    return get_picture(sh) is not None and sh.w >= MIN_WIDTH_CM * EMU_PER_CM   # real width (iter_shapes)
 
 
 def to_png(blob, path):
@@ -355,6 +399,7 @@ def process_slide(slide, n, pipeline, img_dir, stats, log, ocr_times):
     """Return {title, layout, elements, images} for one slide, in reading order."""
     title, elements, images = "", [], []
     pic_i = 0
+    unwrap_alternate_content(slide)          # make equation text boxes visible to python-pptx
     shapes = reading_order(list(iter_shapes(slide.shapes)))
 
     for sh in shapes:
@@ -398,7 +443,7 @@ def process_slide(slide, n, pipeline, img_dir, stats, log, ocr_times):
             t0 = time.perf_counter()
             try:
                 pic_elements, s = ocr_picture(pipeline, img_path,
-                                              OUTPUT_DIR / "ocr_raw" / img_path.stem)
+                                              img_dir.parent / "ocr_raw" / img_path.stem)
             except Exception as e:
                 print(f"[slide {n}] picture {pic_i} OCR failed: {e}")
                 pic_elements, s = [], {"regions": 0, "image_regions_ocrd": 0, "labels": []}
@@ -519,19 +564,57 @@ def main():
         print("Cannot reach llama-server on port 8090. Start it first.")
         return
 
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    img_dir = OUTPUT_DIR / "images"
-    img_dir.mkdir(exist_ok=True)
-
-    prs = Presentation(PPTX_PATH)
-    total_slides = len(prs.slides)
-    n_slides = min(MAX_SLIDES, total_slides)
-    lecture = LECTURE_NAME or Path(PPTX_PATH).stem
+    decks = sorted(p for p in PPTX_DIR.glob("*.pptx") if not p.name.startswith("~$"))  # ~$ = PowerPoint lock files
+    if not decks:
+        print(f"No .pptx files found in {PPTX_DIR}")
+        return
+    print(f"Found {len(decks)} decks in {PPTX_DIR}")
 
     print("Loading PaddleOCR-VL pipeline (layout model + llama-server backend)...")
     t_load = time.perf_counter()
-    pipeline = build_pipeline()
+    pipeline = build_pipeline()                # loaded once, reused for every deck
     print(f"Pipeline ready in {time.perf_counter() - t_load:.1f}s\n")
+
+    all_chunks_dir = OUTPUT_DIR / "all_chunks"
+    all_chunks_dir.mkdir(parents=True, exist_ok=True)
+    results, t_all = [], time.perf_counter()
+    for i, path in enumerate(decks, 1):
+        out_dir = OUTPUT_DIR / path.stem
+        if RESUME and (out_dir / "chunks.jsonl").exists():
+            print(f"===== [{i}/{len(decks)}] {path.name}: already done, skipping (RESUME=True)")
+            continue
+        print(f"\n===== [{i}/{len(decks)}] {path.name}")
+        try:
+            r = process_deck(path, pipeline, out_dir)
+        except Exception as e:                 # one broken deck should not stop the others
+            print(f"!!!!! {path.name} failed: {e!r}")
+            results.append({"deck": path.name, "error": repr(e)})
+            continue
+        (all_chunks_dir / f"{path.stem}_chunks.jsonl").write_text(
+            (out_dir / "chunks.jsonl").read_text(encoding="utf-8"), encoding="utf-8")
+        results.append(r)
+
+    print("\n================ ALL DECKS ================")
+    for r in results:
+        if "error" in r:
+            print(f"  {r['deck']:<45} FAILED: {r['error'][:60]}")
+        else:
+            print(f"  {r['deck']:<45} {r['slides']:>3} slides  {r['chunks']:>3} chunks  "
+                  f"{r['pictures']:>3} pictures  {r['seconds'] / 60:5.1f} min")
+    print(f"Total time: {(time.perf_counter() - t_all) / 60:.1f} min")
+    print(f"For slide_rag, copy everything in {all_chunks_dir.resolve()} to slide_rag/data/slides/")
+
+
+def process_deck(pptx_path, pipeline, out_dir):
+    """OCR + chunk one .pptx into out_dir. Returns a small summary dict."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    img_dir = out_dir / "images"
+    img_dir.mkdir(exist_ok=True)
+
+    prs = Presentation(pptx_path)
+    total_slides = len(prs.slides)
+    n_slides = min(MAX_SLIDES, total_slides)
+    lecture = LECTURE_NAMES.get(pptx_path.stem, pptx_path.stem)
 
     ocr_times, t_start = [], time.perf_counter()
     stats = {"tables": 0, "charts": 0, "equations": 0, "pictures": 0,
@@ -548,19 +631,19 @@ def main():
         print(f"[slide {n}] {len(data['elements'])} elements | title: {data['title'][:60]!r}")
 
     # Pass 2: build chunks with context headers (needs neighbors' titles)
-    chunks = build_chunks(slides, lecture, PPTX_PATH, total_slides)
+    chunks = build_chunks(slides, lecture, pptx_path, total_slides)
 
     for s in slides:
         slide_chunks = [c["text"] for c in chunks if c["metadata"]["slide"] == s["n"]]
-        (OUTPUT_DIR / f"slide_{s['n']:03d}.md").write_text(
+        (out_dir / f"slide_{s['n']:03d}.md").write_text(
             "\n\n---\n\n".join(slide_chunks), encoding="utf-8")
 
-    with open(OUTPUT_DIR / "chunks.jsonl", "w", encoding="utf-8") as f:
+    (out_dir / "run_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2),
+                                          encoding="utf-8")
+    # written last: its presence means "this deck finished" (used by RESUME)
+    with open(out_dir / "chunks.jsonl", "w", encoding="utf-8") as f:
         for c in chunks:
             f.write(json.dumps(c, ensure_ascii=False) + "\n")
-
-    (OUTPUT_DIR / "run_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2),
-                                             encoding="utf-8")
 
     elapsed = time.perf_counter() - t_start
     type_counts = {}
@@ -568,22 +651,12 @@ def main():
         for e in s["elements"]:
             type_counts[e["type"]] = type_counts.get(e["type"], 0) + 1
 
-    print("\n========== SUMMARY ==========")
-    print(f"Slides processed    : {n_slides} of {total_slides}")
-    print(f"Chunks written      : {len(chunks)}")
-    print("Content by type     : " + ", ".join(f"{TYPE_LABELS.get(t, t)}={c}"
+    print(f"--- {pptx_path.name}: {n_slides} of {total_slides} slides, {len(chunks)} chunks, "
+          f"{stats['pictures']} pictures (failed/skipped: {stats['failed']}), {elapsed / 60:.1f} min")
+    print("    content by type: " + ", ".join(f"{TYPE_LABELS.get(t, t)}={c}"
                                             for t, c in sorted(type_counts.items())))
-    print(f"Pictures processed  : {stats['pictures']}  (failed/skipped: {stats['failed']})")
-    print(f"Image regions OCR'd : {stats['image_regions_ocrd']}")
-    print(f"Total time          : {elapsed:.1f}s")
-    if ocr_times:
-        avg = sum(ocr_times) / len(ocr_times)
-        all_pics = sum(1 for s in prs.slides for sh in iter_shapes(s.shapes)
-                       if not (getattr(sh, "has_chart", False) and sh.has_chart)
-                       and is_candidate_picture(sh))
-        print(f"Avg per picture     : {avg:.1f}s")
-        print(f"Full deck estimate  : {all_pics} pictures x {avg:.1f}s = ~{all_pics * avg / 60:.1f} min")
-    print(f"Output folder       : {OUTPUT_DIR.resolve()}")
+    return {"deck": pptx_path.name, "slides": n_slides, "chunks": len(chunks),
+            "pictures": stats["pictures"], "seconds": elapsed}
 
 
 if __name__ == "__main__":

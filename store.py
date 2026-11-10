@@ -26,6 +26,61 @@ def lecture_key(source_file):
 
 # ---------------- loading -----------------------------------------------
 
+_SKIP_TITLE = re.compile(config.SKIP_TITLE_RE, re.I)
+_SKIP_LISTED = {k.lower(): set(v) for k, v in config.SKIP_SLIDES.items()}
+_REASONS = {
+    "listed": "in SKIP_SLIDES",
+    "empty": f"body under {config.MIN_BODY_CHARS} chars",
+    "outline": "title matches SKIP_TITLE_RE",
+    "duplicate": "same text as an earlier slide",
+}
+
+
+def skip_reason(m, body, seen_bodies):
+    """Return why a slide chunk should be skipped, or None to keep it."""
+    lec = lecture_key(m.get("source_file", ""))
+    if m.get("slide") in _SKIP_LISTED.get(lec, ()):
+        return "listed"
+    if len(body) < config.MIN_BODY_CHARS:                 # title-only / logo / video slides
+        return "empty"
+    if _SKIP_TITLE.search((m.get("title") or "").strip()):
+        return "outline"
+    if config.SKIP_DUPLICATE_SLIDES:
+        if (lec, body) in seen_bodies:                    # repeated outline / recap
+            return "duplicate"
+        seen_bodies.add((lec, body))
+    return None
+
+
+def slide_label(m):
+    """'Lecture05-...pptx', slide 3, part 2 -> 'L05 S3p2'."""
+    part = f"p{m['part']}" if m.get("parts", 1) > 1 else ""
+    return f"L{lecture_key(m.get('source_file', ''))[-2:]} S{m.get('slide')}{part}"
+
+
+def print_skipped(skipped):
+    """Listed slides as compact numbers; automatic skips one per line with a preview to check."""
+    if not skipped:
+        return
+    print(f"Skipped {len(skipped)} slide chunks:")
+    for reason, desc in _REASONS.items():
+        rows = [(c, body) for r, c, body in skipped if r == reason]
+        if not rows:
+            continue
+        print(f"\n  {reason} ({desc}): {len(rows)}")
+        if reason == "listed":
+            by_lec = {}
+            for c, _ in rows:
+                lec, s = slide_label(c["metadata"]).split(" ")
+                by_lec.setdefault(lec, []).append(s[1:])
+            for lec, nums in by_lec.items():
+                print(f"    {lec}: {', '.join(nums)}")
+        else:
+            for c, body in rows:
+                preview = body.replace("\n", " ")[:70]
+                print(f"    {slide_label(c['metadata']):<12} {preview}")
+    print()
+
 def load_chunks():
     """Read the study-guide chunks and all slide chunk files into one list."""
     chunks = []
@@ -34,30 +89,20 @@ def load_chunks():
             c = json.loads(line)
             c["metadata"]["layer"] = "study_guide"
             chunks.append(c)
-    skipped = {"empty": 0, "outline": 0, "duplicate": 0}
-    skip_title = re.compile(config.SKIP_TITLE_RE, re.I)
+    skipped = []                      # (reason, chunk, body) for the report
     seen_bodies = set()
     for path in config.SLIDE_CHUNK_FILES:
         with open(path, encoding="utf-8") as f:
             for line in f:
                 c = json.loads(line)
-                m = c["metadata"]
                 body = c["text"].split("\n\n", 1)[-1].strip()   # text after the context header
-                if len(body) < config.MIN_BODY_CHARS:            # title-only / logo / video slides
-                    skipped["empty"] += 1
+                reason = skip_reason(c["metadata"], body, seen_bodies)
+                if reason:
+                    skipped.append((reason, c, body))
                     continue
-                if skip_title.search((m.get("title") or "").strip()):
-                    skipped["outline"] += 1
-                    continue
-                key = (lecture_key(m.get("source_file", "")), body)
-                if config.SKIP_DUPLICATE_SLIDES and key in seen_bodies:   # repeated outline / recap
-                    skipped["duplicate"] += 1
-                    continue
-                seen_bodies.add(key)
-                m["layer"] = "slides"
+                c["metadata"]["layer"] = "slides"
                 chunks.append(c)
-    if any(skipped.values()):
-        print("Skipped slide chunks: " + ", ".join(f"{v} {k}" for k, v in skipped.items() if v))
+    print_skipped(skipped)
     if not chunks:
         raise SystemExit(f"No chunks found. Check paths in config.py (DATA_DIR={config.DATA_DIR})")
     return chunks
