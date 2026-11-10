@@ -44,7 +44,7 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 # ---------------- CONFIG ----------------
-PPTX_PATH = r"pptx\Lecture06-Transformers.pptx"    # <-- change this
+PPTX_PATH = r"pptx\Lecture07-Vision-Language-Models.pptx"    # <-- change this
 LECTURE_NAME = ""     
 OUTPUT_DIR = Path("slide_rag_output")
 MAX_SLIDES = 100                              # test on first 10 slides; set large for all

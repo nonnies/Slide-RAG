@@ -1,0 +1,18 @@
+# One question per line. Lines starting with # are ignored.
+What is the goal of NLP according to the Siri dialogue example?
+Why are one-hot word vectors a problem for web search?
+What is Zipf's law and why does it cause sparsity?
+Write the normal equation for linear regression and say when it is slow.
+Why is least-squares regression a bad choice for classification?
+What is the cross-entropy cost of logistic regression?
+How do you fix high variance vs high bias in a learning algorithm?
+What is the difference between L1 and L2 regularization?
+In back-propagation, what do the add gate, max gate and mul gate do to the gradient?
+Write the RNN recurrence equation and name its weight matrices.
+Why do vanishing gradients happen in RNNs and how are exploding gradients fixed?
+What is masked self-attention and why does the decoder need it?
+What are BERT's two pre-training tasks?
+How does ELMo differ from BERT and GPT architecturally?
+What are the three steps of InstructGPT RLHF?
+What is chain-of-thought prompting and how much did it improve GSM8K?
+What are the three training stages of InternVL?
