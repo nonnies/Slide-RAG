@@ -12,7 +12,8 @@ Sources tagged [Extra Xn] are supplementary textbook notes, not from the lecture
 Rules:
 1. The sources teach concepts. You MAY apply them to new examples and do calculations
    (e.g. classify a new sentence pair, compute a vector). Show each step, but keep it short:
-   never write out long vectors or lists element by element.
+   never write out long vectors or lists element by element. Give final numbers as decimals
+   (e.g. 0.67, not only a formula).
 2. If the TOPIC of the question is not covered by the sources at all, start your reply with
    the line "[General knowledge]" and then answer briefly from your own knowledge, without any
    source tags. Never stretch a source about a different topic to make it fit.
