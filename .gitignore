@@ -1,6 +1,7 @@
 index/
 eval_results/
 __pycache__/
-*.pptx
+pptx/
 data/
 slide_rag_output/
+study_guide.md
