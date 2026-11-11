@@ -9,6 +9,8 @@ STUDY_GUIDE_CHUNKS = DATA_DIR / "study_guide_chunks.jsonl"   # from Claude (73 c
 SUPPLEMENT_CHUNKS = DATA_DIR / "supplement_chunks.jsonl"     # 7 topics NOT in the slides; delete the file to exclude them
 SLIDE_CHUNK_FILES = sorted((DATA_DIR / "slides").glob("*.jsonl"))  # from slide_rag_test.py, one per lecture
 INDEX_DIR = ROOT / "index"                                   # built by `python rag.py index`
+SLIDE_IMAGE_DIR = DATA_DIR / "slide_images"    # Lecture01-01.jpg ... (for web.py)
+PPTX_DIR = Path(r"pptx")    # <-- folder with the .pptx files (web.py opens them)
 
 # ---- embeddings (sentence-transformers, runs in your PyTorch env) ------
 # multilingual-e5-small: 470 MB, understands EN/ZH/TH queries, ~0.5 GB VRAM or fine on CPU.
@@ -55,6 +57,6 @@ LLM_TIMEOUT = 300
 # Relevance gate: if even the best-matching chunk has a dense (cosine) score below this, the
 # question is treated as off-topic and no course sources are sent. None = off.
 # Pick the value from the "top dense score" table printed by `python eval.py retrieval`.
-MIN_TOP_SCORE = 0.80
+MIN_TOP_SCORE = None
 OFF_TOPIC = "general"     # "general": answer from general knowledge, tagged [General knowledge]
                           # "refuse":  reply "The lecture slides do not cover this."

@@ -6,6 +6,7 @@ embeddings with sentence-transformers, keyword search with BM25, generation with
 ```
 slide_rag/
   rag.py        CLI: index / ask / chat / eval
+  web.py        browser chat with the retrieved slides shown as pictures
   config.py     all paths, model names and knobs
   embed.py      text -> vectors (sentence-transformers)
   store.py      load chunks, build index, hybrid search, cited-slide expansion
@@ -15,6 +16,7 @@ slide_rag/
     supplement_chunks.jsonl         9 topics NOT in the slides (TF-IDF, beam search, HMM/Viterbi,
                                     skip-gram, Naive Bayes, n-grams, perplexity, RAG, bag-of-words); delete to exclude
     slides/*.jsonl                  chunks.jsonl from slide_rag_test.py, one per lecture
+    slide_images/                   Lecture01-01.jpg ... one picture per slide (for web.py)
   index/                            created by `python rag.py index`
   questions.txt                     your test questions for `eval`
 ```
@@ -72,9 +74,9 @@ embedding model in `config.py`, then rebuild the index.
 Two question sets:
 - `eval_set.jsonl` (default): 54 questions. 45 should be answered: exam-style questions modelled on
   the sample exam (new examples, small calculations, design scenarios), including the RAG questions
-  (answered from Extra X8), and one question per supplementary topic. 9 should be refused with
-  "The lecture slides do not cover this.": u1–u5 (off-topic, or a detail the lecturer never gave)
-  and r1–r4 (NLP topics covered nowhere).
+  (answered from Extra X8), and one question per supplementary topic. 9 are covered by no source: u1–u5 (off-topic, or a
+  detail the lecturer never gave) and r1–r4 (NLP topics covered nowhere). For these the model must
+  either refuse or answer under a "[General knowledge]" tag; answering from memory untagged is a failure.
 - `eval_set_concepts.jsonl`: 42 questions that use the slides' own wording (easier for retrieval).
 
 ```
@@ -93,8 +95,8 @@ python eval.py generation --judge   # also asks the LLM whether each answer is s
 - `fact recall` / `all facts present`: key facts found in the answer (string match, so check misses by hand)
 - `cites a gold source`: the answer cites at least one relevant chunk
 - `citations valid`: cited tags were really given to the model (catches made-up citations)
-- `correct abstention` / `wrong abstention`: says "not in the sources" for the 9 unanswerable
-  questions, and does not for the answerable ones
+- `outside-source questions refused or tagged`: the 9 questions no source covers are either refused
+  or answered under "[General knowledge]"; `wrong refusal`: refuses an answerable one
 - `judged supported` (optional): the local LLM grades its own answers. A small model is a lenient
   judge, so treat this as a rough signal only
 
@@ -108,3 +110,23 @@ written from general textbook knowledge, not from your lecturer, so they are kep
 tagged `[Extra X1]` … `[Extra X9]` instead of slide tags, and the model is told to say
 "(not from the lecture slides)" when it uses them. To check they do not crowd out the lecture
 material, run `python eval.py retrieval` with and without the file (rebuild the index each time).
+
+## Answers outside the sources
+
+When the sources do not cover a question (or only part of it), the model answers from its own
+knowledge under a "[General knowledge]" line, and the program adds a note that this part is not
+from the course and may be wrong. Set `MIN_TOP_SCORE` in `config.py` to send clearly off-topic
+questions straight to general knowledge without any course sources (faster, and always tagged), or
+set `OFF_TOPIC = "refuse"` to refuse them instead.
+
+## Browser chat (web.py)
+
+```
+pip install gradio pywin32
+python web.py
+```
+A page opens at http://127.0.0.1:7860. Under each answer you see the slides it used: ★ marks slides
+the answer cites, the others were retrieved. Click a slide to enlarge it, then "Open selected slide
+in PowerPoint" opens the .pptx at that slide (needs PowerPoint, pywin32 and `PPTX_DIR` in `config.py`;
+without pywin32 it opens the file at slide 1). llama-server must be running as for `rag.py`.
+Each question is answered on its own: the model does not see earlier questions in the chat.
