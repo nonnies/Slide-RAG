@@ -76,23 +76,34 @@ def other_sources(chunks):
 # ---------------- opening a slide in PowerPoint ---------------------------------
 
 def open_in_powerpoint(lec, n):
-    path = config.PPTX_DIR / DECKS[lec]
+    path = (config.PPTX_DIR / DECKS[lec]).resolve()
     if not path.exists():
         return f"Not found: {path}. Set PPTX_DIR in config.py."
     if sys.platform != "win32":
         return "Opening PowerPoint only works on Windows."
-    try:                                                   # PowerPoint: open the deck at that slide
+    try:
         import win32com.client
+    except ImportError:                                    # no pywin32: default app, slide 1
+        os.startfile(str(path))
+        return f"Opened {DECKS[lec]} at slide 1: run `pip install pywin32` to jump to slide {n}."
+    try:
         app = win32com.client.Dispatch("PowerPoint.Application")
         app.Visible = True
-        pres = next((p for p in app.Presentations if os.path.samefile(p.FullName, path)), None)
-        pres = pres or app.Presentations.Open(str(path))
-        pres.Windows(1).Activate()
-        pres.Windows(1).View.GotoSlide(n)
+        pres = next((p for p in app.Presentations
+                     if str(p.FullName).lower() == str(path).lower()), None)
+        if pres is None:
+            pres = app.Presentations.Open(str(path), ReadOnly=False, Untitled=False, WithWindow=True)
+        win = pres.Windows(1)
+        win.Activate()
+        win.ViewType = 9                                   # ppViewNormal: GotoSlide needs a normal view
+        win.View.GotoSlide(n)
+        try:
+            pres.Slides(n).Select()                        # also highlight it in the thumbnail pane
+        except Exception:
+            pass
         return f"Opened {DECKS[lec]} at slide {n}."
-    except Exception:                                      # no PowerPoint/pywin32: default app, slide 1
-        os.startfile(str(path))
-        return f"Opened {DECKS[lec]} (go to slide {n} yourself; install pywin32 to jump there)."
+    except Exception as e:                                 # show the real reason instead of hiding it
+        return f"PowerPoint could not jump to slide {n}: {e}"
 
 
 # ---------------- the page --------------------------------------------------
