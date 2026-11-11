@@ -12,6 +12,8 @@ slide_rag/
   llm.py        prompt + llama-server call
   data/
     study_guide_chunks.jsonl        from Claude
+    supplement_chunks.jsonl         9 topics NOT in the slides (TF-IDF, beam search, HMM/Viterbi,
+                                    skip-gram, Naive Bayes, n-grams, perplexity, RAG, bag-of-words); delete to exclude
     slides/*.jsonl                  chunks.jsonl from slide_rag_test.py, one per lecture
   index/                            created by `python rag.py index`
   questions.txt                     your test questions for `eval`
@@ -64,3 +66,45 @@ embedding model in `config.py`, then rebuild the index.
    original wording travels with the rewritten explanation.
 3. Chunks are trimmed to `MAX_CONTEXT_CHARS` and sent to the LLM with their tags
    (`[L03 Slide 12]`, `[L03 Guide 3.5]`); the LLM is told to answer only from them and cite tags.
+
+## Evaluate
+
+Two question sets:
+- `eval_set.jsonl` (default): 54 questions. 45 should be answered: exam-style questions modelled on
+  the sample exam (new examples, small calculations, design scenarios), including the RAG questions
+  (answered from Extra X8), and one question per supplementary topic. 9 should be refused with
+  "The lecture slides do not cover this.": u1–u5 (off-topic, or a detail the lecturer never gave)
+  and r1–r4 (NLP topics covered nowhere).
+- `eval_set_concepts.jsonl`: 42 questions that use the slides' own wording (easier for retrieval).
+
+```
+python eval.py retrieval            # no LLM needed, takes seconds
+python eval.py generation           # needs llama-server; answers every question
+python eval.py retrieval eval_set_concepts.jsonl   # the other question set
+python eval.py generation --judge   # also asks the LLM whether each answer is supported
+```
+
+**Retrieval** (per mode: dense, bm25, hybrid, and the final context the LLM sees)
+- `hit@k`: a gold slide (or a guide chunk citing it) is in the top k
+- `recall`: share of the gold slides covered by the retrieved chunks
+- `mrr`: 1 / rank of the first relevant chunk (1.0 = always first)
+
+**Generation**
+- `fact recall` / `all facts present`: key facts found in the answer (string match, so check misses by hand)
+- `cites a gold source`: the answer cites at least one relevant chunk
+- `citations valid`: cited tags were really given to the model (catches made-up citations)
+- `correct abstention` / `wrong abstention`: says "not in the sources" for the 9 unanswerable
+  questions, and does not for the answerable ones
+- `judged supported` (optional): the local LLM grades its own answers. A small model is a lenient
+  judge, so treat this as a rough signal only
+
+Per-question details, including full answers, are written to `eval_results/`. Change one setting
+at a time (e.g. TOP_K or EMBED_MODEL), rebuild the index if needed, and compare runs.
+
+## Supplementary topics (not in the slides)
+
+`data/supplement_chunks.jsonl` adds 9 standard NLP topics that Lectures 01–07 do not cover. They are
+written from general textbook knowledge, not from your lecturer, so they are kept apart: they are
+tagged `[Extra X1]` … `[Extra X9]` instead of slide tags, and the model is told to say
+"(not from the lecture slides)" when it uses them. To check they do not crowd out the lecture
+material, run `python eval.py retrieval` with and without the file (rebuild the index each time).

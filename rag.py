@@ -9,7 +9,7 @@ import sys
 
 import config
 from embed import Embedder
-from llm import ask_llm, build_messages, source_tag
+from llm import GENERAL_TAG, REFUSAL, add_notes, ask_llm, build_messages, general_messages, source_tag
 from store import Store, build_index
 
 
@@ -18,12 +18,24 @@ def retrieve(store, embedder, question):
 
 
 def answer(store, embedder, question, show_sources=True):
-    chunks = retrieve(store, embedder, question)
-    if show_sources:
-        print("Sources: " + "  ".join(source_tag(c) for c in chunks), flush=True)
-    for piece in ask_llm(build_messages(question, chunks), stream=True):
+    qvec = embedder.query(question)
+    text = ""
+    if store.relevant(qvec):
+        chunks = store.search(question, qvec)
+        messages = build_messages(question, chunks)
+        if show_sources:
+            print("Sources: " + "  ".join(source_tag(c) for c in chunks), flush=True)
+    elif config.OFF_TOPIC == "refuse":                 # relevance gate (config.MIN_TOP_SCORE)
+        print(REFUSAL)
+        return
+    else:                                              # off-topic: general knowledge, tagged by code
+        messages = general_messages(question)
+        text = GENERAL_TAG + "\n"
+        print(text, end="", flush=True)
+    for piece in ask_llm(messages, stream=True):
         print(piece, end="", flush=True)
-    print()
+        text += piece
+    print(add_notes(text)[len(text):])                 # labels for Extra / general-knowledge parts
 
 
 def main(argv):

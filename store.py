@@ -89,6 +89,12 @@ def load_chunks():
             c = json.loads(line)
             c["metadata"]["layer"] = "study_guide"
             chunks.append(c)
+    if config.SUPPLEMENT_CHUNKS.exists():             # optional: topics NOT in the lecture slides
+        with open(config.SUPPLEMENT_CHUNKS, encoding="utf-8") as f:
+            for line in f:
+                c = json.loads(line)
+                c["metadata"]["layer"] = "supplement"
+                chunks.append(c)
     skipped = []                      # (reason, chunk, body) for the report
     seen_bodies = set()
     for path in config.SLIDE_CHUNK_FILES:
@@ -119,7 +125,9 @@ def build_index(embedder):
             f.write(json.dumps(c, ensure_ascii=False) + "\n")
     np.save(config.INDEX_DIR / "vectors.npy", vectors)
     n_guide = sum(c["metadata"]["layer"] == "study_guide" for c in chunks)
-    print(f"Indexed {len(chunks)} chunks ({n_guide} study guide, {len(chunks) - n_guide} slides) "
+    n_extra = sum(c["metadata"]["layer"] == "supplement" for c in chunks)
+    print(f"Indexed {len(chunks)} chunks ({n_guide} study guide, {n_extra} supplement, "
+          f"{len(chunks) - n_guide - n_extra} slides) "
           f"-> {config.INDEX_DIR}")
 
 
@@ -141,6 +149,13 @@ class Store:
             if m["layer"] == "slides":
                 self.slide_lookup.setdefault((lecture_key(m["source_file"]), m["slide"]), i)
 
+    def top_score(self, qvec):
+        """Best dense (cosine) score of any chunk: low means the question is off-topic."""
+        return float((self.vectors @ qvec).max())
+
+    def relevant(self, qvec):
+        return config.MIN_TOP_SCORE is None or self.top_score(qvec) >= config.MIN_TOP_SCORE
+
     def dense(self, qvec, k):
         scores = self.vectors @ qvec
         top = np.argsort(-scores)[:k]
@@ -160,16 +175,22 @@ class Store:
         ranked = sorted(fused.items(), key=lambda x: -x[1])
         return ranked[:k], fused
 
+    def linked_slides(self, m):
+        """(lecture, slide) pairs a guide chunk cites or a supplement chunk relates to."""
+        if m["layer"] == "study_guide":
+            return [(lecture_key(m["source_file"]), n) for n in m.get("cited_slides", [])]
+        if m["layer"] == "supplement":                     # "L02 Slide 3" -> ("lecture02", 3)
+            return [(f"lecture{t.split()[0][1:]}", int(t.split()[-1]))
+                    for t in m.get("related_slides", [])]
+        return []
+
     def expand(self, hits, scores):
-        """Append slide chunks cited by retrieved study-guide chunks (best-scoring ones first)."""
+        """Append slide chunks linked from retrieved guide/supplement chunks (best-scoring first)."""
         chosen = [i for i, _ in hits]
         extra = []
         for i in chosen:
             m = self.chunks[i]["metadata"]
-            if m["layer"] != "study_guide":
-                continue
-            cited = [self.slide_lookup.get((lecture_key(m["source_file"]), n))
-                     for n in m.get("cited_slides", [])]
+            cited = [self.slide_lookup.get(key) for key in self.linked_slides(m)]
             cited = [j for j in cited if j is not None and j not in chosen and j not in extra]
             cited.sort(key=lambda j: -scores.get(j, 0.0))      # query-relevant slides first
             extra.extend(cited[:config.EXPAND_CITED_SLIDES])

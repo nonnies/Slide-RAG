@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parent
 # ---- data -------------------------------------------------------------
 DATA_DIR = ROOT / "data"
 STUDY_GUIDE_CHUNKS = DATA_DIR / "study_guide_chunks.jsonl"   # from Claude (73 chunks)
+SUPPLEMENT_CHUNKS = DATA_DIR / "supplement_chunks.jsonl"     # 7 topics NOT in the slides; delete the file to exclude them
 SLIDE_CHUNK_FILES = sorted((DATA_DIR / "slides").glob("*.jsonl"))  # from slide_rag_test.py, one per lecture
 INDEX_DIR = ROOT / "index"                                   # built by `python rag.py index`
 
@@ -43,5 +44,17 @@ MAX_CONTEXT_CHARS = 9000      # ~2.5k tokens; keep well inside the LLM context w
 LLM_URL = "http://127.0.0.1:8090/v1/chat/completions"
 LLM_MODEL = "local"           # llama-server ignores the name, but the field is required
 LLM_TEMPERATURE = 0.2
-LLM_MAX_TOKENS = 700
+LLM_MAX_TOKENS = 1024
+LLM_REPEAT_PENALTY = 1.1      # >1 discourages repeating the same tokens; 1.0 = off
+# Extra fields sent with every request. This turns off "thinking" for Qwen3/Qwen3.5-style models
+# (other models ignore it). Use {} to send nothing extra.
+LLM_EXTRA = {"chat_template_kwargs": {"enable_thinking": False}}
+EVAL_TEMPERATURE = 0.0        # eval.py answers with this, so two runs differ only by your changes
 LLM_TIMEOUT = 300
+
+# Relevance gate: if even the best-matching chunk has a dense (cosine) score below this, the
+# question is treated as off-topic and no course sources are sent. None = off.
+# Pick the value from the "top dense score" table printed by `python eval.py retrieval`.
+MIN_TOP_SCORE = 0.80
+OFF_TOPIC = "general"     # "general": answer from general knowledge, tagged [General knowledge]
+                          # "refuse":  reply "The lecture slides do not cover this."

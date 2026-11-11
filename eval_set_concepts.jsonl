@@ -1,0 +1,42 @@
+{"id": "q01", "area": "1 Text & NLI", "question": "What is the goal of NLP according to the Siri dialogue example?", "lecture": "L01", "slides": [10], "facts": ["deep understanding", "predicate", "resolve|reference"]}
+{"id": "q02", "area": "1 Text & NLI", "question": "Why are one-hot word vectors a problem for web search?", "lecture": "L01", "slides": [44, 45], "facts": ["orthogonal", "similarity"]}
+{"id": "q03", "area": "1 Text & NLI", "question": "What is Zipf's law and why does it make language data sparse?", "lecture": "L01", "slides": [29, 30, 31], "facts": ["zipf", "frequen", "rare|infrequent|never been seen"]}
+{"id": "q04", "area": "1 Text & NLI", "question": "What is the idea of distributional semantics?", "lecture": "L01", "slides": [46], "facts": ["company it keeps", "context"]}
+{"id": "q05", "area": "1 Text & NLI", "question": "What are the problems with using WordNet for word meaning?", "lecture": "L01", "slides": [42, 43], "facts": ["nuance", "new meaning|up to date|up-to-date", "human labor|human labour"]}
+{"id": "q06", "area": "1 Text & NLI", "question": "Give an example of ambiguity at multiple levels from the lecture.", "lecture": "L01", "slides": [26, 27], "facts": ["duck|elephant|telescope"]}
+{"id": "q07", "area": "S Supervised & NN", "question": "Write the normal equation for linear regression and say when it is slow.", "lecture": "L02", "slides": [23, 24, 26], "facts": ["invers|⁻¹|^-1|^{-1}|inv(", "large"]}
+{"id": "q08", "area": "S Supervised & NN", "question": "Why should features be normalized before gradient descent?", "lecture": "L02", "slides": [19], "facts": ["scale", "mean", "converge|faster|stuck"]}
+{"id": "q09", "area": "S Supervised & NN", "question": "In the coin toss example, what is the likelihood of the observations?", "lecture": "L02", "slides": [32, 33, 34], "facts": ["bernoulli", "θ³|theta^3|θ^3|\\theta^3|theta³"]}
+{"id": "q10", "area": "S Supervised & NN", "question": "Compare gradient descent and the normal equations: what are the tradeoffs?", "lecture": "L02", "slides": [26], "facts": ["learning rate|α|alpha", "iterat", "large"]}
+{"id": "q11", "area": "S Supervised & NN", "question": "Why is least-squares regression a bad choice for classification?", "lecture": "L03", "slides": [6, 7, 8], "facts": ["outlier"]}
+{"id": "q12", "area": "S Supervised & NN", "question": "What is the cross-entropy cost function of logistic regression?", "lecture": "L03", "slides": [11, 12, 13], "facts": ["log", "cross"]}
+{"id": "q13", "area": "S Supervised & NN", "question": "What is the difference between L1 and L2 regularization?", "lecture": "L03", "slides": [32, 37], "facts": ["sparse|sparsity", "square"]}
+{"id": "q14", "area": "S Supervised & NN", "question": "How do you fix high variance versus high bias in a learning algorithm?", "lecture": "L03", "slides": [52], "facts": ["more training|more data", "increas", "decreas", "feature"]}
+{"id": "q15", "area": "S Supervised & NN", "question": "Explain the bias-variance trade-off.", "lecture": "L03", "slides": [39, 41, 42], "facts": ["complex", "bias", "variance"]}
+{"id": "q16", "area": "S Supervised & NN", "question": "How does N-fold cross-validation work?", "lecture": "L03", "slides": [48], "facts": ["average", "validation"]}
+{"id": "q17", "area": "S Supervised & NN", "question": "Which feature transformation makes the XOR-like data linearly separable?", "lecture": "L03", "slides": [20], "facts": ["x1·x2|x₁·x₂|x1*x2|x1x2|x₁x₂|x1⋅x2|x₁⋅x₂|product", "linearly separable"]}
+{"id": "q18", "area": "S Supervised & NN", "question": "In back-propagation, what do the add gate, max gate and mul gate do to the gradient?", "lecture": "L04", "slides": [49], "facts": ["distribut", "rout", "switch"]}
+{"id": "q19", "area": "S Supervised & NN", "question": "In the back-propagation example f(x, y, z) = (x + y)z with x = -2, y = 5, z = -4, what are f and the gradients?", "lecture": "L04", "slides": [41, 42, 43, 44, 45, 46, 47, 48], "facts": ["-12|−12", "-4|−4"]}
+{"id": "q20", "area": "S Supervised & NN", "question": "How is logistic regression related to a multi-layer perceptron?", "lecture": "L04", "slides": [21], "facts": ["no hidden layer|without a hidden layer|without hidden layer", "special case"]}
+{"id": "q21", "area": "S Supervised & NN", "question": "What layers does the LeNet convolutional network use?", "lecture": "L04", "slides": [33], "facts": ["convolution", "subsampl|pooling"]}
+{"id": "q22", "area": "2 RNN", "question": "Write the RNN recurrence equation and name its weight matrices.", "lecture": "L05", "slides": [12, 13], "facts": ["tanh", "whh", "wxh"]}
+{"id": "q23", "area": "2 RNN", "question": "Why do vanishing gradients happen in RNNs and how are exploding gradients fixed?", "lecture": "L05", "slides": [28, 31, 32, 37], "facts": ["clip", "lstm", "product|multipl"]}
+{"id": "q24", "area": "2 RNN", "question": "How does the character-level RNN language model work on the word hello?", "lecture": "L05", "slides": [15, 16, 17], "facts": ["hello", "one-hot|onehot|one hot", "next character|next char"]}
+{"id": "q25", "area": "2 RNN", "question": "What is ReLU and why is it used instead of sigmoid in deep networks?", "lecture": "L05", "slides": [37, 38], "facts": ["max(0", "vanish|gradient"]}
+{"id": "q26", "area": "2 RNN", "question": "What evidence did the lecture give that deeper networks generalize better?", "lecture": "L05", "slides": [35, 36], "facts": ["11", "96"]}
+{"id": "q27", "area": "3 Transformer", "question": "What is masked self-attention and why does the decoder need it?", "lecture": "L06", "slides": [14, 15, 16], "facts": ["look ahead|future", "-∞|−∞|-inf|infinity"]}
+{"id": "q28", "area": "3 Transformer", "question": "How are the attention weights computed from queries, keys and values?", "lecture": "L06", "slides": [8, 9, 13], "facts": ["softmax", "√d|sqrt(d|\\sqrt{d|square root|sqrt d"]}
+{"id": "q29", "area": "3 Transformer", "question": "What are BERT's two pre-training tasks?", "lecture": "L06", "slides": [32, 33, 34], "facts": ["mask", "next sentence", "15%|15 %"]}
+{"id": "q30", "area": "3 Transformer", "question": "How does the transformer encode the position of tokens?", "lecture": "L06", "slides": [21], "facts": ["sin", "cos"]}
+{"id": "q31", "area": "3 Transformer", "question": "How does ELMo differ from BERT and GPT architecturally?", "lecture": "L06", "slides": [42, 43], "facts": ["lstm", "bidirectional", "left-to-right|left to right"]}
+{"id": "q32", "area": "3 Transformer", "question": "What is the main disadvantage of transformers compared with RNNs?", "lecture": "L06", "slides": [28], "facts": ["quadratic"]}
+{"id": "q33", "area": "5 VLM", "question": "What are the three steps of InstructGPT RLHF?", "lecture": "L07", "slides": [27], "facts": ["supervised|sft", "reward model", "ppo|reinforcement"]}
+{"id": "q34", "area": "5 VLM", "question": "What is chain-of-thought prompting and how much did it improve GSM8K for PaLM 540B?", "lecture": "L07", "slides": [31, 32], "facts": ["intermediate|step", "57", "18"]}
+{"id": "q35", "area": "5 VLM", "question": "How was the instruction-following data for LLaVA generated?", "lecture": "L07", "slides": [37, 38], "facts": ["gpt-4|gpt4", "caption", "bounding box|boxes"]}
+{"id": "q36", "area": "5 VLM", "question": "What are the three training stages of InternVL?", "lecture": "L07", "slides": [48], "facts": ["contrastive", "generative", "fine-tun|finetun"]}
+{"id": "q37", "area": "5 VLM", "question": "How does DALL-E turn an image into tokens?", "lecture": "L07", "slides": [6, 7], "facts": ["8192", "32"]}
+{"id": "q38", "area": "5 VLM", "question": "What is RLAIF and how did it compare with RLHF?", "lecture": "L07", "slides": [29, 30], "facts": ["ai feedback|llm", "harmless"]}
+{"id": "u01", "area": "none", "question": "What is the capital of Australia?", "unanswerable": true}
+{"id": "u02", "area": "none", "question": "How does a support vector machine choose its margin?", "unanswerable": true}
+{"id": "u03", "area": "none", "question": "What dropout rate did the lecturer recommend for training?", "unanswerable": true}
+{"id": "u04", "area": "none", "question": "Who won the 2022 FIFA World Cup?", "unanswerable": true}
