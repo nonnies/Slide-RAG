@@ -15,7 +15,7 @@ slide_rag/
     study_guide_chunks.jsonl        from Claude
     supplement_chunks.jsonl         9 topics NOT in the slides (TF-IDF, beam search, HMM/Viterbi,
                                     skip-gram, Naive Bayes, n-grams, perplexity, RAG, bag-of-words); delete to exclude
-    slides/*.jsonl                  chunks.jsonl from slide_rag_test.py, one per lecture
+    slides/*.jsonl                  chunks.jsonl from slide_rag_OCR.py, one per lecture
     slide_images/                   Lecture01-01.jpg ... one picture per slide (for web.py)
   index/                            created by `python rag.py index`
   questions.txt                     your test questions for `eval`
