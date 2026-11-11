@@ -1,0 +1,10 @@
+# RAG + web app (conda env "rag")
+sentence-transformers
+rank_bm25
+numpy
+requests
+gradio
+pywin32; sys_platform == "win32"   # jump to a slide in PowerPoint
+pymupdf                            # render_slides.py
+
+# OCR step (slide-rag-OCR.py) needs its own environment, see README
