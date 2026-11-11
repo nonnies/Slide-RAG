@@ -1,3 +1,6 @@
 index/
 eval_results/
 __pycache__/
+*.pptx
+data/
+slide_rag_output/
