@@ -39,9 +39,9 @@ Put your files in `data/`:
    ```
    python rag.py index
    ```
-2. Start a chat LLM with llama-server on port 8091, e.g.
+2. Start a chat LLM with llama-server on port 8090, e.g.
    ```
-   llama-server -m Qwen3-4B-Instruct-2507-Q4_K_M.gguf -c 8192 -ngl 99 --port 8091
+   llama-server -m Qwen3-4B-Instruct-2507-Q4_K_M.gguf -c 8192 -ngl 99 --port 8090
    ```
    Any instruction-tuned GGUF works; ~4B at Q4 fits a 6 GB card with 8k context.
    (Stop the PaddleOCR-VL server first if VRAM is tight.)
